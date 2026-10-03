@@ -1,0 +1,94 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\StoreCourseRequest;
+use App\Http\Requests\UpdateCourseRequest;
+use App\Models\Course;
+use App\Models\Instructor;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\View\View;
+
+class CourseController extends Controller
+{
+    /**
+     * Display a listing of the resource.
+     */
+    public function index(): View
+    {
+        return view('courses.index', [
+            'courses' => Course::with('instructor')->get(),
+        ]);
+    }
+
+    public function create(): View
+    {
+        return view('courses.create', [
+            'course' => new Course,
+            'instructors' => Instructor::orderBy('name')->get(),
+        ]);
+    }
+
+    public function store(StoreCourseRequest $request): RedirectResponse
+    {
+        $data = $request->validated();
+
+        if ($request->hasFile('image')) {
+            $data['image_path'] = $request->file('image')->store('courses', 'public');
+        }
+
+        unset($data['image']);
+        $course = Course::create($data);
+
+        return redirect()->route('courses.show', $course)->with('status', 'Course created.');
+    }
+
+    public function show(Course $course): View
+    {
+        return view('courses.show', compact('course'));
+    }
+
+    public function edit(Course $course): View
+    {
+        return view('courses.edit', [
+            'course' => $course,
+            'instructors' => Instructor::orderBy('name')->get(),
+        ]);
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(UpdateCourseRequest $request, Course $course): RedirectResponse
+    {
+        $data = $request->validated();
+
+        if ($request->hasFile('image')) {
+            if ($course->image_path) {
+                Storage::disk('public')->delete($course->image_path);
+            }
+
+            $data['image_path'] = $request->file('image')->store('courses', 'public');
+        }
+
+        unset($data['image']);
+        $course->update($data);
+
+        return redirect()->route('courses.show', $course)->with('status', 'Course updated.');
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(Course $course): RedirectResponse
+    {
+        if ($course->image_path) {
+            Storage::disk('public')->delete($course->image_path);
+        }
+
+        $course->delete();
+
+        return redirect()->route('courses.index')->with('status', 'Course deleted.');
+    }
+}
